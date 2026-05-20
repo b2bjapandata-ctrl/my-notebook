@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>My Notebook</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Notebook">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:      #1a1a2e;
+  --paper:    #faf8f3;
+  --cream:    #f2ede3;
+  --line:     #e0d9cc;
+  --accent:   #c0392b;
+  --accent2:  #e67e22;
+  --blue:     #2980b9;
+  --green:    #27ae60;
+  --purple:   #8e44ad;
+  --muted:    #9a9080;
+  --shadow:   0 2px 16px rgba(0,0,0,0.09);
+  --radius:   16px;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+body { font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; overflow-x:hidden; }
+
+/* ── NAV TABS ── */
+.nav-bar {
+  position:sticky; top:0; z-index:200;
+  background:var(--ink);
+  display:flex; align-items:stretch;
+}
+.nav-tab {
+  flex:1; padding:14px 4px 12px;
+  background:none; border:none; color:rgba(255,255,255,0.5);
+  font-family:'DM Sans',sans-serif; font-size:11px; font-weight:500;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
+  transition:color 0.15s;
+  border-bottom:3px solid transparent;
+}
+.nav-tab .icon { font-size:20px; }
+.nav-tab.active { color:#fff; border-bottom-color:var(--accent2); }
+
+/* ── VIEWS ── */
+.view { display:none; min-height:calc(100vh - 55px); }
+.view.active { display:block; }
+
+/* ══════════════════════════════════════════
+   CALENDAR VIEW
+══════════════════════════════════════════ */
+.cal-header {
+  background:var(--ink); color:#fff;
+  padding:14px 18px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.cal-month-title { font-family:'Caveat',cursive; font-size:26px; font-weight:700; }
+.cal-nav-btn {
+  background:rgba(255,255,255,0.12); border:none; color:#fff;
+  width:34px; height:34px; border-radius:10px;
+  font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.cal-nav-btn:active { background:rgba(255,255,255,0.25); }
+.today-btn {
+  background:var(--accent2); border:none; color:#fff;
+  padding:6px 14px; border-radius:10px;
+  font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer;
+}
+
+.weekdays {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  background:var(--ink); padding:0 6px 8px;
+}
+.weekday {
+  text-align:center; font-size:11px; font-weight:600;
+  color:rgba(255,255,255,0.45); padding:2px 0;
+}
+.weekday:first-child { color:#e74c3c; }
+.weekday:last-child  { color:#3498db; }
+
+.cal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  gap:3px; padding:8px 6px; background:var(--cream);
+}
+.cal-day {
+  background:var(--paper);
+  border-radius:12px;
+  min-height:62px;
+  padding:5px 4px 4px;
+  cursor:pointer;
+  position:relative;
+  transition:transform 0.1s;
+  border:1.5px solid transparent;
+}
+.cal-day:active { transform:scale(0.95); }
+.cal-day.other-month { background:transparent; opacity:0.35; }
+.cal-day.today { border-color:var(--accent); background:var(--paper); }
+.cal-day.today .day-num { background:var(--accent); color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; margin:0 auto 2px; }
+.cal-day.selected { border-color:var(--accent2); box-shadow:0 0 0 2px rgba(230,126,34,0.25); }
+.day-num { font-size:13px; font-weight:600; text-align:center; margin-bottom:2px; color:var(--ink); }
+.cal-day.sunday   .day-num { color:#e74c3c; }
+.cal-day.saturday .day-num { color:#2980b9; }
+.cal-day.today.sunday   .day-num,
+.cal-day.today.saturday .day-num { color:#fff; }
+.day-dots { display:flex; flex-wrap:wrap; gap:2px; justify-content:center; margin-top:2px; }
+.day-dot { width:5px; height:5px; border-radius:50%; }
+.day-preview { font-size:9px; color:var(--muted); margin-top:2px; line-height:1.3;
+  overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+/* Orange accent strip */
+.cal-accent { height:3px; background:var(--accent2); }
+
+/* ── DAY DETAIL PANEL ── */
+.day-panel {
+  margin:0 10px 14px;
+  background:var(--paper);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.day-panel-header {
+  background:var(--ink); color:#fff;
+  padding:10px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.day-panel-date { font-family:'Caveat',cursive; font-size:20px; font-weight:700; }
+.day-panel-dow  { font-size:12px; color:rgba(255,255,255,0.55); margin-left:8px; }
+.btn-add-entry {
+  background:var(--accent2); border:none; color:#fff;
+  padding:6px 14px; border-radius:10px;
+  font-size:12px; font-family:'DM Sans',sans-serif; font-weight:600; cursor:pointer;
+}
+
+/* ── TIME SLOTS ── */
+.time-slots { padding:8px 14px 14px; }
+.time-row {
+  display:flex; align-items:flex-start; gap:10px;
+  min-height:44px; position:relative;
+}
+.time-row + .time-row { border-top:1px solid var(--line); }
+.time-label {
+  font-size:11px; color:var(--muted); font-weight:500;
+  min-width:38px; padding-top:12px; flex-shrink:0;
+}
+.time-entries { flex:1; padding:6px 0; display:flex; flex-direction:column; gap:4px; }
+.entry-chip {
+  border-radius:8px; padding:5px 10px;
+  display:flex; align-items:center; justify-content:space-between; gap:6px;
+  cursor:pointer;
+}
+.entry-chip-text { font-size:13px; font-weight:500; flex:1; }
+.entry-chip-del { font-size:14px; color:rgba(255,255,255,0.6); background:none; border:none; cursor:pointer; padding:0 2px; }
+.add-time-btn {
+  width:100%; padding:8px; border:1.5px dashed var(--line);
+  border-radius:10px; background:none; color:var(--muted);
+  font-size:12.5px; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:6px;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.add-time-btn:active { background:var(--cream); }
+.no-entries { text-align:center; padding:24px; color:var(--muted); font-size:13px; }
+
+/* ══════════════════════════════════════════
+   NOTES VIEW (from original notebook)
+══════════════════════════════════════════ */
+.notes-header {
+  background:var(--ink); padding:14px 18px 12px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.notes-title { font-family:'Caveat',cursive; font-size:26px; font-weight:700; color:#fff; }
+.notes-title span { color:var(--accent2); }
+.header-right { display:flex; gap:8px; }
+.btn-icon {
+  background:rgba(255,255,255,0.12); border:none; color:#fff;
+  width:34px; height:34px; border-radius:10px;
+  font-size:17px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.search-wrap { padding:10px 14px 8px; background:var(--paper); border-bottom:1px solid var(--line); }
+.search-wrap input {
+  width:100%; padding:9px 14px 9px 36px; border-radius:12px;
+  border:1.5px solid var(--line); background:var(--cream);
+  font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); outline:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a9080' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:12px center;
+}
+.search-wrap input:focus { border-color:var(--accent); }
+.filter-tabs { display:flex; gap:8px; padding:9px 14px; overflow-x:auto; background:var(--paper); border-bottom:1px solid var(--line); scrollbar-width:none; }
+.filter-tabs::-webkit-scrollbar { display:none; }
+.ftab { flex-shrink:0; padding:5px 13px; border-radius:20px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-family:'DM Sans',sans-serif; color:var(--muted); cursor:pointer; font-weight:500; }
+.ftab.active { background:var(--ink); border-color:var(--ink); color:#fff; }
+#note-count { font-size:12px; color:var(--muted); padding:4px 0 0 16px; }
+#notes-list { padding:12px 12px 90px; display:flex; flex-direction:column; gap:9px; }
+.note-card {
+  background:var(--paper); border-radius:14px; padding:13px 15px 11px;
+  box-shadow:var(--shadow); border-left:4px solid transparent; cursor:pointer;
+  animation:fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.note-card[data-cat="work"]     { border-left-color:#3498db; }
+.note-card[data-cat="idea"]     { border-left-color:var(--accent2); }
+.note-card[data-cat="personal"] { border-left-color:#27ae60; }
+.note-card[data-cat="task"]     { border-left-color:var(--accent); }
+.note-card[data-cat="memo"]     { border-left-color:#9b59b6; }
+.note-card[data-cat="calendar"] { border-left-color:#e67e22; }
+.note-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.note-title { font-family:'Caveat',cursive; font-size:20px; font-weight:600; color:var(--ink); flex:1; line-height:1.2; word-break:break-word; }
+.note-body { font-size:13px; color:var(--muted); margin-top:5px; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-wrap; }
+.note-footer { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+.note-date { font-size:11px; color:var(--muted); font-weight:300; }
+.note-tag { font-size:11px; padding:2px 9px; border-radius:20px; background:#ede8df; color:var(--muted); font-weight:500; }
+.note-tag[data-cat="work"]     { background:#ddeeff; color:#2471a3; }
+.note-tag[data-cat="idea"]     { background:#fef3e2; color:#e67e22; }
+.note-tag[data-cat="personal"] { background:#e2f5ea; color:#1e8449; }
+.note-tag[data-cat="task"]     { background:#fde8e8; color:#c0392b; }
+.note-tag[data-cat="memo"]     { background:#f3e6ff; color:#7d3c98; }
+.note-tag[data-cat="calendar"] { background:#fef3e2; color:#c0842b; }
+.empty-state { text-align:center; padding:50px 20px; color:var(--muted); }
+.empty-state .big { font-family:'Caveat',cursive; font-size:52px; margin-bottom:8px; }
+.empty-state p { font-size:13.5px; line-height:1.6; }
+
+/* ── FAB ── */
+.fab {
+  position:fixed; bottom:22px; right:18px;
+  width:56px; height:56px; border-radius:17px;
+  background:var(--accent); color:#fff; font-size:28px; border:none;
+  box-shadow:0 6px 20px rgba(192,57,43,0.38);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; z-index:150;
+  transition:transform 0.12s;
+}
+.fab:active { transform:scale(0.92); }
+
+/* ══════════════════════════════════════════
+   MODALS
+══════════════════════════════════════════ */
+.overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(26,26,46,0.5); z-index:400; align-items:flex-end;
+}
+.overlay.open { display:flex; }
+.modal {
+  background:var(--paper); border-radius:22px 22px 0 0;
+  width:100%; max-height:94vh;
+  display:flex; flex-direction:column;
+  animation:slideUp 0.22s ease; overflow:hidden;
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-handle { width:38px; height:4px; background:var(--line); border-radius:2px; margin:11px auto 0; flex-shrink:0; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:9px 16px 11px; flex-shrink:0; border-bottom:1px solid var(--line); }
+.modal-title { font-family:'Caveat',cursive; font-size:21px; font-weight:700; color:var(--ink); }
+.modal-acts { display:flex; gap:7px; }
+.btn-del  { background:#fde8e8; border:none; color:var(--accent); padding:6px 13px; border-radius:9px; font-size:12.5px; font-family:'DM Sans',sans-serif; cursor:pointer; font-weight:500; }
+.btn-save { background:var(--ink); border:none; color:#fff; padding:6px 17px; border-radius:9px; font-size:12.5px; font-family:'DM Sans',sans-serif; cursor:pointer; font-weight:500; }
+.modal-body { flex:1; overflow-y:auto; padding:14px 16px 28px; display:flex; flex-direction:column; gap:13px; }
+.field-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); margin-bottom:5px; }
+#inp-title {
+  width:100%; border:none; background:transparent;
+  font-family:'Caveat',cursive; font-size:25px; font-weight:700; color:var(--ink); outline:none;
+  border-bottom:2px solid var(--line); padding-bottom:5px;
+}
+#inp-title:focus { border-bottom-color:var(--accent); }
+#inp-title::placeholder { color:var(--muted); }
+#inp-body {
+  width:100%; min-height:160px; border:1.5px solid var(--line); border-radius:12px;
+  background:var(--cream); padding:11px 13px;
+  font-family:'DM Sans',sans-serif; font-size:14px; line-height:1.65; color:var(--ink);
+  outline:none; resize:none;
+  background-image:repeating-linear-gradient(to bottom,transparent,transparent calc(1.65em - 1px),var(--line) calc(1.65em - 1px),var(--line) 1.65em);
+  background-size:100% 1.65em; background-attachment:local;
+}
+#inp-body:focus { border-color:var(--accent); }
+.cat-picker { display:flex; gap:7px; flex-wrap:wrap; }
+.cat-btn { padding:5px 13px; border-radius:20px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-family:'DM Sans',sans-serif; color:var(--muted); cursor:pointer; font-weight:500; transition:all 0.12s; }
+.cat-btn.sel { color:#fff; border-color:transparent; }
+.cat-btn[data-c="work"].sel     { background:#3498db; }
+.cat-btn[data-c="idea"].sel     { background:var(--accent2); }
+.cat-btn[data-c="personal"].sel { background:#27ae60; }
+.cat-btn[data-c="task"].sel     { background:var(--accent); }
+.cat-btn[data-c="memo"].sel     { background:#9b59b6; }
+.pin-row { display:flex; align-items:center; gap:10px; }
+.toggle { width:40px; height:23px; border-radius:12px; background:var(--line); border:none; cursor:pointer; position:relative; transition:background 0.2s; flex-shrink:0; }
+.toggle::after { content:''; position:absolute; top:3px; left:3px; width:17px; height:17px; border-radius:9px; background:#fff; transition:left 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
+.toggle.on { background:var(--accent); }
+.toggle.on::after { left:20px; }
+.pin-label { font-size:13px; color:var(--muted); }
+
+/* Entry modal (calendar) */
+#ent-title { width:100%; border:none; background:transparent; font-family:'Caveat',cursive; font-size:24px; font-weight:700; color:var(--ink); outline:none; border-bottom:2px solid var(--line); padding-bottom:5px; }
+#ent-title:focus { border-bottom-color:var(--accent2); }
+#ent-title::placeholder { color:var(--muted); }
+#ent-body { width:100%; min-height:120px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); padding:11px 13px; font-family:'DM Sans',sans-serif; font-size:14px; line-height:1.65; color:var(--ink); outline:none; resize:none; }
+#ent-body:focus { border-color:var(--accent2); }
+.time-select-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.time-sel { padding:8px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--cream); font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); outline:none; cursor:pointer; }
+.time-sel:focus { border-color:var(--accent2); }
+.color-picker { display:flex; gap:8px; flex-wrap:wrap; }
+.color-dot { width:28px; height:28px; border-radius:50%; border:2.5px solid transparent; cursor:pointer; transition:transform 0.1s; }
+.color-dot.sel { border-color:var(--ink); transform:scale(1.15); }
+.color-dot:active { transform:scale(0.9); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav-bar">
+  <button class="nav-tab active" id="tab-cal" onclick="switchView('cal')">
+    <span class="icon">📅</span>Calendar
+  </button>
+  <button class="nav-tab" id="tab-notes" onclick="switchView('notes')">
+    <span class="icon">📓</span>Notes
+  </button>
+</nav>
+
+<!-- ═══════════════ CALENDAR VIEW ═══════════════ -->
+<div class="view active" id="view-cal">
+  <div class="cal-header">
+    <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="cal-month-title" id="cal-month-title"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="today-btn" onclick="goToday()">Today</button>
+      <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  <div class="weekdays">
+    <div class="weekday">Sun</div><div class="weekday">Mon</div><div class="weekday">Tue</div>
+    <div class="weekday">Wed</div><div class="weekday">Thu</div><div class="weekday">Fri</div>
+    <div class="weekday">Sat</div>
+  </div>
+  <div class="cal-accent"></div>
+  <div class="cal-grid" id="cal-grid"></div>
+
+  <!-- Day detail panel -->
+  <div class="day-panel" id="day-panel">
+    <div class="day-panel-header">
+      <div>
+        <span class="day-panel-date" id="panel-date-label">Select a day</span>
+        <span class="day-panel-dow" id="panel-dow-label"></span>
+      </div>
+      <button class="btn-add-entry" onclick="openEntryModal()">+ Add</button>
+    </div>
+    <div class="time-slots" id="time-slots">
+      <div class="no-entries">Tap a date to see schedule</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ NOTES VIEW ═══════════════ -->
+<div class="view" id="view-notes">
+  <div class="notes-header">
+    <div class="notes-title">My <span>Notes</span></div>
+    <div class="header-right">
+      <button class="btn-icon" onclick="exportNotes()" title="Export">💾</button>
+      <button class="btn-icon" onclick="toggleSort()" id="sort-btn">🔃</button>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <input id="search" type="search" placeholder="Search notes…" oninput="renderNotes()">
+  </div>
+  <div class="filter-tabs" id="filter-tabs">
+    <button class="ftab active" data-f="all"      onclick="setFilter('all',this)">All</button>
+    <button class="ftab" data-f="work"             onclick="setFilter('work',this)">💼 Work</button>
+    <button class="ftab" data-f="idea"             onclick="setFilter('idea',this)">💡 Idea</button>
+    <button class="ftab" data-f="personal"         onclick="setFilter('personal',this)">🌱 Personal</button>
+    <button class="ftab" data-f="task"             onclick="setFilter('task',this)">✅ Task</button>
+    <button class="ftab" data-f="memo"             onclick="setFilter('memo',this)">📌 Memo</button>
+    <button class="ftab" data-f="calendar"         onclick="setFilter('calendar',this)">📅 Calendar</button>
+  </div>
+  <div id="note-count"></div>
+  <div id="notes-list"></div>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="fabClick()">＋</button>
+
+<!-- ═══ NOTE MODAL ═══ -->
+<div class="overlay" id="note-overlay" onclick="if(event.target===this)closeNoteModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="note-modal-label">New Note</div>
+      <div class="modal-acts">
+        <button class="btn-del" id="note-btn-del" style="display:none" onclick="deleteNote()">Delete</button>
+        <button class="btn-save" onclick="saveNote()">Save</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div><input id="inp-title" type="text" placeholder="Title…" maxlength="80"></div>
+      <div>
+        <div class="field-label">Category</div>
+        <div class="cat-picker">
+          <button class="cat-btn" data-c="work"     onclick="selNoteCat('work',this)">💼 Work</button>
+          <button class="cat-btn" data-c="idea"     onclick="selNoteCat('idea',this)">💡 Idea</button>
+          <button class="cat-btn" data-c="personal" onclick="selNoteCat('personal',this)">🌱 Personal</button>
+          <button class="cat-btn" data-c="task"     onclick="selNoteCat('task',this)">✅ Task</button>
+          <button class="cat-btn" data-c="memo"     onclick="selNoteCat('memo',this)">📌 Memo</button>
+        </div>
+      </div>
+      <div><textarea id="inp-body" placeholder="Write your note here…"></textarea></div>
+      <div class="pin-row">
+        <button class="toggle" id="pin-toggle" onclick="togglePin(this)"></button>
+        <span class="pin-label">📌 Pin to top</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CALENDAR ENTRY MODAL ═══ -->
+<div class="overlay" id="ent-overlay" onclick="if(event.target===this)closeEntryModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="ent-modal-label">New Entry</div>
+      <div class="modal-acts">
+        <button class="btn-del" id="ent-btn-del" style="display:none" onclick="deleteEntry()">Delete</button>
+        <button class="btn-save" onclick="saveEntry()" style="background:var(--accent2)">Save</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div><input id="ent-title" type="text" placeholder="What's happening?" maxlength="80"></div>
+      <div>
+        <div class="field-label">Time</div>
+        <div class="time-select-row">
+          <select id="ent-hour" class="time-sel"></select>
+          <span style="color:var(--muted);font-size:13px">to</span>
+          <select id="ent-end-hour" class="time-sel"></select>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Color</div>
+        <div class="color-picker" id="color-picker"></div>
+      </div>
+      <div><textarea id="ent-body" placeholder="Memo / Notes…" style="min-height:100px"></textarea></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════
+const NOTES_KEY    = 'nb_notes_v2';
+const ENTRIES_KEY  = 'nb_entries_v2';
+let notes   = JSON.parse(localStorage.getItem(NOTES_KEY)   || '[]');
+let entries = JSON.parse(localStorage.getItem(ENTRIES_KEY) || '{}'); // {dateKey: [entry,...]}
+
+function saveNotes()   { localStorage.setItem(NOTES_KEY,   JSON.stringify(notes)); }
+function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
+
+// ═══════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})
+       + '  '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+function dateKey(y,m,d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ═══════════════════════════════════════════
+//  VIEW SWITCH
+// ═══════════════════════════════════════════
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('tab-'+v).classList.add('active');
+  // update FAB visibility
+  document.getElementById('fab').style.display = v==='notes'?'flex':'none';
+}
+
+// ═══════════════════════════════════════════
+//  CALENDAR
+// ═══════════════════════════════════════════
+const ENTRY_COLORS = ['#e74c3c','#e67e22','#f1c40f','#27ae60','#2980b9','#8e44ad','#1abc9c','#34495e'];
+let calYear, calMonth, selDateKey = null, editEntryId = null, selColor = ENTRY_COLORS[4];
+
+function initCal() {
+  const t = new Date();
+  calYear  = t.getFullYear();
+  calMonth = t.getMonth();
+  // populate time selects
+  const sh = document.getElementById('ent-hour');
+  const eh = document.getElementById('ent-end-hour');
+  for (let h=0;h<24;h++) {
+    const label = `${String(h).padStart(2,'0')}:00`;
+    sh.add(new Option(label,h));
+    eh.add(new Option(label,h));
+  }
+  sh.value = 9; eh.value = 10;
+  // color picker
+  const cp = document.getElementById('color-picker');
+  ENTRY_COLORS.forEach((c,i)=>{
+    const d = document.createElement('div');
+    d.className='color-dot'+(i===4?' sel':'');
+    d.style.background=c;
+    d.onclick=()=>{ document.querySelectorAll('.color-dot').forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); selColor=c; };
+    cp.appendChild(d);
+  });
+  renderCal();
+  selectDay(t.getFullYear(),t.getMonth(),t.getDate());
+}
+
+function changeMonth(d) { calMonth+=d; if(calMonth>11){calMonth=0;calYear++;} if(calMonth<0){calMonth=11;calYear--;} renderCal(); }
+function goToday()  { const t=new Date(); calYear=t.getFullYear(); calMonth=t.getMonth(); renderCal(); selectDay(t.getFullYear(),t.getMonth(),t.getDate()); }
+
+function renderCal() {
+  document.getElementById('cal-month-title').textContent = `${MON[calMonth]} ${calYear}`;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML='';
+  const today = new Date();
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const days  = new Date(calYear, calMonth+1, 0).getDate();
+  const prev  = new Date(calYear, calMonth, 0).getDate();
+
+  // prev month padding
+  for(let i=0;i<first;i++) {
+    const d = prev-first+1+i;
+    const cell = makeCell(calYear, calMonth-1<0?calYear-1:calYear, calMonth-1<0?11:calMonth-1, d, true);
+    grid.appendChild(cell);
+  }
+  // current month
+  for(let d=1;d<=days;d++) {
+    const isToday = (d===today.getDate()&&calMonth===today.getMonth()&&calYear===today.getFullYear());
+    const cell = makeCell(calYear, calYear, calMonth, d, false, isToday);
+    grid.appendChild(cell);
+  }
+  // next month padding
+  const total = first+days;
+  const rem = total%7===0?0:7-(total%7);
+  for(let d=1;d<=rem;d++) {
+    const cell = makeCell(calYear, calMonth+1>11?calYear+1:calYear, calMonth+1>11?0:calMonth+1, d, true);
+    grid.appendChild(cell);
+  }
+}
+
+function makeCell(dispYear, y, m, d, other, isToday=false) {
+  const div = document.createElement('div');
+  const dk  = dateKey(y,m,d);
+  const dow = new Date(y,m,d).getDay();
+  div.className='cal-day'+(other?' other-month':'')+(isToday?' today':'')+(dow===0?' sunday':'')+(dow===6?' saturday':'')+(dk===selDateKey?' selected':'');
+  const dayEnts = entries[dk]||[];
+  const sortedEnts = [...dayEnts].sort((a,b)=>a.hour-b.hour);
+  const preview = sortedEnts[0] ? sortedEnts[0].title : '';
+  div.innerHTML=`<div class="day-num">${d}</div>`+
+    (dayEnts.length?`<div class="day-dots">${sortedEnts.slice(0,3).map(e=>`<div class="day-dot" style="background:${e.color||'#2980b9'}"></div>`).join('')}</div>`+
+    `<div class="day-preview">${esc(preview)}</div>`:'');
+  div.onclick=()=>selectDay(y,m,d);
+  return div;
+}
+
+function selectDay(y,m,d) {
+  selDateKey = dateKey(y,m,d);
+  // update grid highlight
+  document.querySelectorAll('.cal-day').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('.cal-day').forEach(c=>{
+    const cell_d = parseInt(c.querySelector('.day-num')?.textContent||'0');
+    if(!c.classList.contains('other-month') && cell_d===d) c.classList.add('selected');
+  });
+  // update panel
+  const dt = new Date(y,m,d);
+  document.getElementById('panel-date-label').textContent = `${dt.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`;
+  document.getElementById('panel-dow-label').textContent  = DOW[dt.getDay()];
+  renderDayPanel();
+}
+
+function renderDayPanel() {
+  const slot = document.getElementById('time-slots');
+  const dayEnts = entries[selDateKey]||[];
+  if(!dayEnts.length) {
+    slot.innerHTML='<div class="no-entries">✨ No entries yet — tap <b>+ Add</b> to schedule something</div>'+addBtn();
+    return;
+  }
+  const sorted = [...dayEnts].sort((a,b)=>a.hour-b.hour);
+  let html='';
+  sorted.forEach(e=>{
+    const endLabel = e.endHour!=null ? ` – ${String(e.endHour).padStart(2,'0')}:00` : '';
+    html+=`<div class="time-row">
+      <div class="time-label">${String(e.hour).padStart(2,'0')}:00${endLabel}</div>
+      <div class="time-entries">
+        <div class="entry-chip" style="background:${e.color||'#2980b9'}" onclick="openEditEntry('${e.id}')">
+          <span class="entry-chip-text" style="color:#fff">${esc(e.title||'(no title)')}</span>
+          ${e.memo?`<span style="font-size:11px;color:rgba(255,255,255,0.7)">📝</span>`:''}
+        </div>
+        ${e.memo?`<div style="font-size:12px;color:var(--muted);padding:2px 4px;white-space:pre-wrap">${esc(e.memo)}</div>`:''}
+      </div>
+    </div>`;
+  });
+  html+=addBtn();
+  slot.innerHTML=html;
+}
+
+function addBtn() { return `<button class="add-time-btn" onclick="openEntryModal()">＋ Add entry</button>`; }
+
+// ── Entry Modal ───────────────────────────────────────────────
+function openEntryModal() {
+  editEntryId=null;
+  document.getElementById('ent-modal-label').textContent='New Entry for '+selDateKey;
+  document.getElementById('ent-btn-del').style.display='none';
+  document.getElementById('ent-title').value='';
+  document.getElementById('ent-body').value='';
+  document.getElementById('ent-hour').value=9;
+  document.getElementById('ent-end-hour').value=10;
+  resetColorPicker(ENTRY_COLORS[4]);
+  document.getElementById('ent-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('ent-title').focus(),300);
+}
+function openEditEntry(id) {
+  const dayEnts = entries[selDateKey]||[];
+  const e = dayEnts.find(x=>x.id===id);
+  if(!e) return;
+  editEntryId=id;
+  document.getElementById('ent-modal-label').textContent='Edit Entry';
+  document.getElementById('ent-btn-del').style.display='';
+  document.getElementById('ent-title').value=e.title||'';
+  document.getElementById('ent-body').value=e.memo||'';
+  document.getElementById('ent-hour').value=e.hour||0;
+  document.getElementById('ent-end-hour').value=e.endHour!=null?e.endHour:(e.hour||0)+1;
+  resetColorPicker(e.color||ENTRY_COLORS[4]);
+  document.getElementById('ent-overlay').classList.add('open');
+}
+function resetColorPicker(c) {
+  selColor=c;
+  document.querySelectorAll('.color-dot').forEach(d=>{
+    d.classList.toggle('sel', d.style.background===c||rgbMatch(d.style.background,c));
+  });
+}
+function rgbMatch(rgb,hex) {
+  // crude match – good enough for our fixed palette
+  const d=document.createElement('div'); d.style.background=hex; document.body.appendChild(d);
+  const cs=getComputedStyle(d).backgroundColor; document.body.removeChild(d);
+  return rgb===cs;
+}
+function saveEntry() {
+  const title = document.getElementById('ent-title').value.trim();
+  const memo  = document.getElementById('ent-body').value.trim();
+  const hour  = parseInt(document.getElementById('ent-hour').value);
+  const endH  = parseInt(document.getElementById('ent-end-hour').value);
+  if(!title && !memo) { closeEntryModal(); return; }
+  if(!entries[selDateKey]) entries[selDateKey]=[];
+  if(editEntryId) {
+    const i = entries[selDateKey].findIndex(x=>x.id===editEntryId);
+    if(i>-1) entries[selDateKey][i]={...entries[selDateKey][i],title,memo,hour,endHour:endH,color:selColor};
+  } else {
+    entries[selDateKey].push({id:uid(),title,memo,hour,endHour:endH,color:selColor,ts:Date.now()});
+  }
+  saveEntries();
+  renderDayPanel();
+  renderCal();
+  closeEntryModal();
+}
+function deleteEntry() {
+  if(!editEntryId||!selDateKey) return;
+  if(!confirm('Delete this entry?')) return;
+  entries[selDateKey]=(entries[selDateKey]||[]).filter(x=>x.id!==editEntryId);
+  saveEntries(); renderDayPanel(); renderCal(); closeEntryModal();
+}
+function closeEntryModal() { document.getElementById('ent-overlay').classList.remove('open'); }
+
+// ═══════════════════════════════════════════
+//  NOTES
+// ═══════════════════════════════════════════
+let noteFilter='all', sortDir='desc', editNoteId=null, noteCat='personal', notePinned=false;
+
+function setFilter(f,el) {
+  noteFilter=f;
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active'); renderNotes();
+}
+function toggleSort() { sortDir=sortDir==='desc'?'asc':'desc'; document.getElementById('sort-btn').textContent=sortDir==='desc'?'🔃':'🔼'; renderNotes(); }
+function catLabel(c) { return {work:'💼 Work',idea:'💡 Idea',personal:'🌱 Personal',task:'✅ Task',memo:'📌 Memo',calendar:'📅 Calendar'}[c]||c; }
+
+function renderNotes() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let list = notes.filter(n=>{
+    if(noteFilter!=='all'&&n.cat!==noteFilter) return false;
+    if(q&&!n.title.toLowerCase().includes(q)&&!n.body.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  list.sort((a,b)=>{
+    if(a.pinned&&!b.pinned) return -1; if(!a.pinned&&b.pinned) return 1;
+    return sortDir==='desc'?b.ts-a.ts:a.ts-b.ts;
+  });
+  const el = document.getElementById('notes-list');
+  document.getElementById('note-count').textContent = list.length?list.length+(list.length===1?' note':' notes'):'';
+  if(!list.length) {
+    el.innerHTML=`<div class="empty-state"><div class="big">📓</div><p>${notes.length===0?'Tap <b>+</b> to write your first note!':'No notes match.'}</p></div>`;
+    return;
+  }
+  el.innerHTML=list.map(n=>`
+    <div class="note-card" data-cat="${n.cat||'memo'}" onclick="openEditNote('${n.id}')">
+      <div class="note-top">
+        <div class="note-title">${esc(n.title||'Untitled')}</div>
+        ${n.pinned?'<div style="font-size:14px;opacity:.5">📌</div>':''}
+      </div>
+      ${n.body?`<div class="note-body">${esc(n.body)}</div>`:''}
+      <div class="note-footer">
+        <span class="note-date">${fmtDate(n.ts)}</span>
+        ${n.cat?`<span class="note-tag" data-cat="${n.cat}">${catLabel(n.cat)}</span>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function fabClick() { openNewNote(); }
+
+function openNewNote() {
+  editNoteId=null; notePinned=false; noteCat='personal';
+  document.getElementById('note-modal-label').textContent='New Note';
+  document.getElementById('note-btn-del').style.display='none';
+  document.getElementById('inp-title').value='';
+  document.getElementById('inp-body').value='';
+  document.getElementById('pin-toggle').className='toggle';
+  setNoteCatUI('personal');
+  document.getElementById('note-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('inp-title').focus(),300);
+}
+function openEditNote(id) {
+  const n=notes.find(x=>x.id===id); if(!n) return;
+  editNoteId=id; notePinned=n.pinned||false; noteCat=n.cat||'memo';
+  document.getElementById('note-modal-label').textContent='Edit Note';
+  document.getElementById('note-btn-del').style.display='';
+  document.getElementById('inp-title').value=n.title||'';
+  document.getElementById('inp-body').value=n.body||'';
+  document.getElementById('pin-toggle').className='toggle'+(notePinned?' on':'');
+  setNoteCatUI(noteCat);
+  document.getElementById('note-overlay').classList.add('open');
+}
+function closeNoteModal() { document.getElementById('note-overlay').classList.remove('open'); }
+function saveNote() {
+  const title=document.getElementById('inp-title').value.trim();
+  const body=document.getElementById('inp-body').value.trim();
+  if(!title&&!body){closeNoteModal();return;}
+  if(editNoteId){
+    const n=notes.find(x=>x.id===editNoteId);
+    if(n){n.title=title;n.body=body;n.cat=noteCat;n.pinned=notePinned;n.ts=Date.now();}
+  } else { notes.unshift({id:uid(),title,body,cat:noteCat,pinned:notePinned,ts:Date.now()}); }
+  saveNotes(); renderNotes(); closeNoteModal();
+}
+function deleteNote() {
+  if(!editNoteId) return;
+  if(!confirm('Delete?')) return;
+  notes=notes.filter(x=>x.id!==editNoteId);
+  saveNotes(); renderNotes(); closeNoteModal();
+}
+function selNoteCat(c,btn) { noteCat=c; setNoteCatUI(c); }
+function setNoteCatUI(c) { document.querySelectorAll('.cat-btn').forEach(b=>b.classList.toggle('sel',b.dataset.c===c)); }
+function togglePin(el) { notePinned=!notePinned; el.className='toggle'+(notePinned?' on':''); }
+
+function exportNotes() {
+  if(!notes.length){alert('No notes to export.');return;}
+  const txt=notes.map(n=>`[${catLabel(n.cat||'memo')}]${n.pinned?' 📌':''}\n`+(n.title?n.title+'\n':'')+`${fmtDate(n.ts)}\n`+(n.body?'\n'+n.body:'')+'\n\n---').join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));
+  a.download='my_notes_export.txt'; a.click();
+}
+
+// keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter') {
+    if(document.getElementById('note-overlay').classList.contains('open')) saveNote();
+    if(document.getElementById('ent-overlay').classList.contains('open'))  saveEntry();
+  }
+  if(e.key==='Escape'){closeNoteModal();closeEntryModal();}
+});
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+initCal();
+renderNotes();
+// hide FAB initially (calendar view is default)
+document.getElementById('fab').style.display='none';
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
+}
+</script>
+</body>
+</html>
